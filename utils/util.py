@@ -254,11 +254,16 @@ def compute_ap(tp, conf, pred_cls, target_cls, eps=1e-16):
 
 
 def strip_optimizer(filename):
-    x = torch.load(filename, map_location=torch.device('cpu'))
-    x['model'].half()  # to FP16
+    from model.yolo import YOLO
+    torch.serialization.add_safe_globals([YOLO])
+    x = torch.load(filename, map_location=torch.device('cpu'), weights_only=False)                   ## load checkpoint fully (not weights_only)
+
+    ## convert model to FP16 & disable grads
+    x['model'].half()  
     for p in x['model'].parameters():
         p.requires_grad = False
     torch.save(x, filename)
+
 
 
 def clip_gradients(model, max_norm=10.0):
@@ -542,4 +547,5 @@ class ComputeLoss:
         with torch.no_grad():
             alpha = v / (v - iou + (1 + eps))
         return iou - (rho2 / c2 + v * alpha)  # CIoU
+
 
