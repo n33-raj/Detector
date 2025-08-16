@@ -46,14 +46,35 @@ def setup_multi_processes():
         environ['MKL_NUM_THREADS'] = '1'
 
 
-def scale(coords, shape1, gain, pad):
+def scale(coords, img_shape, gain, pad):
+    # --- Normalize gain ---
+    if isinstance(gain, (list, tuple)):
+        # If gain is nested list, take first element
+        if isinstance(gain[0], (list, tuple)):
+            gain = gain[0]
+        # If gain has 2 elements (x, y), take average
+        if len(gain) == 2:
+            gain = float(gain[0])  # or (gain[0] + gain[1]) / 2 if you want average
+        else:
+            gain = float(gain[0])
+    else:
+        gain = float(gain)
+
+    # --- Normalize pad ---
+    if isinstance(pad, (list, tuple)):
+        pad = [p[0] if isinstance(p, (list, tuple)) else p for p in pad]
+        pad = (float(pad[0]), float(pad[1]))
+    else:
+        raise TypeError(f"Expected pad as list/tuple, got {type(pad)}")
+
+    # --- Apply scaling ---
     coords[:, [0, 2]] -= pad[0]  # x padding
     coords[:, [1, 3]] -= pad[1]  # y padding
-    coords[:, :4] /= gain[0]  # gain_x == gain_y for letterbox
-    coords[:, 0].clamp_(0, shape1[1])  # x1
-    coords[:, 1].clamp_(0, shape1[0])  # y1
-    coords[:, 2].clamp_(0, shape1[1])  # x2
-    coords[:, 3].clamp_(0, shape1[0])  # y2
+    coords[:, :4] /= gain
+    coords[:, 0].clamp_(0, img_shape[1])  # x1
+    coords[:, 1].clamp_(0, img_shape[0])  # y1
+    coords[:, 2].clamp_(0, img_shape[1])  # x2
+    coords[:, 3].clamp_(0, img_shape[0])  # y2
     return coords
 
 
@@ -399,13 +420,25 @@ class ComputeLoss:
         self.bs = pred_scores.size(0)
         self.num_max_boxes = true_bboxes.size(1)
 
+        # if self.num_max_boxes == 0:
+        #     device = true_bboxes.device
+        #     return (torch.full_like(pred_scores[..., 0], self.nc).to(device),
+        #             torch.zeros_like(pred_bboxes).to(device),
+        #             torch.zeros_like(pred_scores).to(device),
+        #             torch.zeros_like(pred_scores[..., 0]).to(device),
+        #             torch.zeros_like(pred_scores[..., 0]).to(device))
+
+
+
         if self.num_max_boxes == 0:
             device = true_bboxes.device
-            return (torch.full_like(pred_scores[..., 0], self.nc).to(device),
-                    torch.zeros_like(pred_bboxes).to(device),
-                    torch.zeros_like(pred_scores).to(device),
-                    torch.zeros_like(pred_scores[..., 0]).to(device),
-                    torch.zeros_like(pred_scores[..., 0]).to(device))
+            # Return shapes matching (target_bboxes, target_scores, fg_mask)
+            target_bboxes = torch.zeros_like(pred_bboxes).to(device)  # [B, N, 4]
+            target_scores = torch.zeros_like(pred_scores).to(device)  # [B, N, num_classes]
+            fg_mask = torch.zeros_like(pred_scores[..., 0]).bool().to(device)  # [B, N]
+            return target_bboxes, target_scores, fg_mask
+
+
 
         i = torch.zeros([2, self.bs, self.num_max_boxes], dtype=torch.long)
         i[0] = torch.arange(end=self.bs).view(-1, 1).repeat(1, self.num_max_boxes)
