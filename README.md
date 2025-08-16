@@ -13,4 +13,26 @@ dataset:
         val
     labels/
         train
-        val 
+        val
+```
+________________________________________________________________________________________
+## Training Instructions
+### Follow the steps below to train the model:
+1) Clone the Repository
+```
+git clone git@github.com:n33-raj/Detector.git
+cd Detector
+```
+2) Prepare Dataset
+   - Place your dataset folder in the parent directory of this repository.
+   - Update the dataset path on line 96 of ```train.py``` with the correct path to your dataset.
+3) Configure Training Parameters
+   - Open train.py
+   - Modify the following parameters as needed:
+       - Batch size
+       - Number of workers
+       - Epochs
+4) Start the training & tain the Model 
+```
+python train.py --train
+```
