@@ -4,7 +4,6 @@ import copy
 import math
 import random
 import time
-
 import numpy
 import torch
 import torchvision
@@ -20,7 +19,6 @@ def setup_seed():
     torch.manual_seed(0)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-
 
 def setup_multi_processes():
     """
@@ -44,7 +42,6 @@ def setup_multi_processes():
     # setup MKL threads
     if 'MKL_NUM_THREADS' not in environ:
         environ['MKL_NUM_THREADS'] = '1'
-
 
 def scale(coords, img_shape, gain, pad):
     # --- Normalize gain ---
@@ -545,3 +542,4 @@ class ComputeLoss:
         with torch.no_grad():
             alpha = v / (v - iou + (1 + eps))
         return iou - (rho2 / c2 + v * alpha)  # CIoU
+
