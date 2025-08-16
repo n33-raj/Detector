@@ -95,13 +95,16 @@ class Dataset(data.Dataset):
         return len(self.filenames)
 
     def load_image(self, i):
-        image = cv2.imread(self.filenames[i])
+        filename = self.filenames[i].replace("\\", "/")  # fix Windows-style paths
+        image = cv2.imread(filename)
+        if image is None:
+            raise FileNotFoundError(f"Image not found or corrupted: {filename}")
         h, w = image.shape[:2]
         r = self.input_size / max(h, w)
         if r != 1:
             image = cv2.resize(image,
-                               dsize=(int(w * r), int(h * r)),
-                               interpolation=resample() if self.augment else cv2.INTER_LINEAR)
+                            dsize=(int(w * r), int(h * r)),
+                            interpolation=resample() if self.augment else cv2.INTER_LINEAR)
         return image, (h, w)
 
     def load_mosaic(self, index, params):
@@ -403,3 +406,4 @@ class Albumentations:
             image = x['image']
             label = numpy.array([[c, *b] for c, b in zip(x['class_labels'], x['bboxes'])])
         return image, label
+
