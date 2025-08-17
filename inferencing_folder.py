@@ -7,14 +7,18 @@ import sys
 import os
 from pathlib import Path
 import yaml
+import torch
 
 from model.yolo import YOLO
 from utils.util import non_max_suppression, scale, wh2xy
+from model.head import Head
+
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-
+## Load model with safe unpickling
+from packaging import version
 
 # Define make_anchors to patch Head module
 def make_anchors(feats, strides, offset=0.5):
@@ -29,13 +33,18 @@ def make_anchors(feats, strides, offset=0.5):
     return torch.cat(anchor_points), torch.cat(stride_tensor)
 
 ## Patch Head class
-from model.head import Head
 Head.make_anchors = staticmethod(make_anchors)
 
-# Load model with safe unpickling
+
+## Compatibility for different PyTorch versions
 def load_model(weights_path, device='cuda' if torch.cuda.is_available() else 'cpu'):
-    torch.serialization.add_safe_globals([YOLO])
-    ckpt = torch.load(weights_path, map_location=device, weights_only=False)
+    if version.parse(torch.__version__) >= version.parse("2.6.0"):
+        from model.yolo import YOLO
+        torch.serialization.add_safe_globals([YOLO])
+        ckpt = torch.load(weights_path, map_location=device, weights_only=False)
+    else:
+        ckpt = torch.load(weights_path, map_location=device)  # older versions ignore weights_only
+
     model = ckpt['model'].float().fuse().eval()
     model.to(device)
     return model
@@ -84,7 +93,8 @@ def draw_results(image, detections, class_names, colors=None):
     if colors is None:
         colors = np.random.randint(0, 255, size=(len(class_names), 3))
     for *xyxy, conf, cls_id in detections:
-        label = f'{class_names[int(cls_id)]} {conf:.2f}'
+        # label = f'{class_names[int(cls_id)]} {conf:.2f}'
+        label = f'{class_names[int(cls_id)]}'
         xyxy = [int(x) for x in xyxy]
         cv2.rectangle(image, xyxy[:2], xyxy[2:], colors[int(cls_id)].tolist(), 2)
         (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
@@ -96,14 +106,14 @@ def draw_results(image, detections, class_names, colors=None):
         )
         cv2.putText(
             image, label, (xyxy[0], xyxy[1] - 5),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1
         )
     return image
 
 def main():
     parser = argparse.ArgumentParser(description='YOLOv8 Inference')
-    parser.add_argument('--weights', type=str, default=r'C:\Users\lenovo\Downloads\detection\YOLOV8-Pytorch-O\custom-det.pt', help='Model weights path')
-    parser.add_argument('--source', type=str, default=r'C:\Users\lenovo\Downloads\detection\YOLOV8-Pytorch-O\test_data', help='Image/video path, folder path or camera ID')
+    parser.add_argument('--weights', type=str, default=r'D:\Nrj\Detector\best-cont.pt', help='Model weights path')
+    parser.add_argument('--source', type=str, default=r'D:\Nrj\Detector\data', help='Image/video path, folder path or camera ID')
     parser.add_argument('--img-size', type=int, default=640, help='Inference size')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='Confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
@@ -115,7 +125,7 @@ def main():
     model = load_model(args.weights, device)
 
     try:
-        with open(r'C:\Users\lenovo\Downloads\detection\YOLOV8-Pytorch-O\config\config.yml', 'r') as f:
+        with open(r'D:\Nrj\Detector\config\config.yml', 'r') as f:
             config = yaml.safe_load(f)
         class_names = list(config['names'].values())
     except:
