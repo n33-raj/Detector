@@ -31,7 +31,7 @@ cd Detector
        - Batch size
        - Number of workers
        - Epochs
-4) Start the training & tain the Model 
+4) Start the training to train the model 
 ```
 python train.py --train
 ```
